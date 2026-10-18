@@ -1,0 +1,131 @@
+name: Merge original PSX-Place CE PKG with CGEMU342
+
+on:
+  workflow_dispatch:
+    inputs:
+      original_pkg_url:
+        description: "HTTPS URL of your own original RetroArch_Psx-Place.pkg (238 MB). Downloaded into ephemeral CI only."
+        type: string
+        required: true
+      original_pkg_sha256:
+        description: "SHA-256 of the original file (64 lowercase/uppercase hex digits)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  merge_original_ce:
+    name: Build preserving original CE files
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate input
+        shell: bash
+        env:
+          ORIGINAL_URL: ${{ inputs.original_pkg_url }}
+          ORIGINAL_SHA: ${{ inputs.original_pkg_sha256 }}
+        run: |
+          case "$ORIGINAL_URL" in https://*) ;; *) echo "HTTPS URL required"; exit 1 ;; esac
+          if ! [[ "$ORIGINAL_SHA" =~ ^[0-9a-fA-F]{64}$ ]]; then
+            echo "Invalid original PKG sha256"
+            exit 1
+          fi
+
+      - name: Fetch original package and verify SHA-256
+        shell: bash
+        env:
+          ORIGINAL_URL: ${{ inputs.original_pkg_url }}
+          ORIGINAL_SHA: ${{ inputs.original_pkg_sha256 }}
+        run: |
+          curl --fail --location --silent --show-error \
+            --proto '=https' --proto-redir '=https' \
+            --max-time 900 --output original-ce.pkg "$ORIGINAL_URL"
+          echo "$ORIGINAL_SHA  original-ce.pkg" | sha256sum --check -
+          test "$(stat -c %s original-ce.pkg)" -gt 200000000
+          test "$(stat -c %s original-ce.pkg)" -lt 500000000
+
+      - name: Checkout open-source FCEUmm/RetroArch sources
+        run: |
+          git clone --depth 1 --branch master https://github.com/libretro/libretro-fceumm.git upstream-fceumm
+          git clone --depth 1 --branch master https://github.com/libretro/RetroArch.git upstream-retroarch
+          echo "FCEUmm source: $(git -C upstream-fceumm rev-parse HEAD)" > BUILD-INFO.txt
+          echo "RetroArch source: $(git -C upstream-retroarch rev-parse HEAD)" >> BUILD-INFO.txt
+          echo "Original sha256: $(sha256sum original-ce.pkg)" >> BUILD-INFO.txt
+
+      - name: Patch CGEMU342 and target original CE Title ID
+        shell: bash
+        run: |
+          python3 scripts/prepare_fceumm.py upstream-fceumm --mapper301 8157
+          cc -std=c99 -Wall -Wextra -Werror -O2 tests/test_cg342_container.c -o /tmp/cg342-test
+          /tmp/cg342-test
+          python3 scripts/apply_cg342_fceumm.py upstream-fceumm
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('upstream-retroarch/frontend/drivers/platform_ps3.c')
+          src=p.read_text(encoding='utf-8')
+          a='#define EMULATOR_CONTENT_DIR "SSNE10001"'
+          if src.count(a) != 1:
+              raise SystemExit("PS3 application ID patch anchor missing")
+          p.write_text(src.replace(a, '#define EMULATOR_CONTENT_DIR "RETROARCH"'),encoding='utf-8')
+          PY
+
+      - name: Cross-compile PS3 FCEUmm SELF
+        shell: bash
+        run: |
+          docker run --rm --user root -v "$GITHUB_WORKSPACE:/work" -w /work \
+            reallibretroretroarch/libretro-build-psl1ght:latest \
+            bash -euc '
+              cd upstream-fceumm
+              make -f Makefile.libretro platform=psl1ght HAVE_HDPACK=0 HAVE_NTSC=0 -j2
+              test -s fceumm_libretro_psl1ght.a
+              cd ../upstream-retroarch
+              cp ../upstream-fceumm/fceumm_libretro_psl1ght.a libretro_psl1ght.a
+              make -f Makefile.psl1ght create-core -j2
+              test -s pkg/psl1ght/pkg/USRDIR/cores/CORE.SELF
+            '
+
+      - name: Extract and stage original CE, retaining all files
+        shell: bash
+        run: |
+          python3 -m pip install --quiet cryptography
+          python3 scripts/stage_original_ce.py original-ce.pkg \
+            upstream-retroarch/pkg/psl1ght/pkg/USRDIR/cores/CORE.SELF \
+            staged-psx-ce
+          test -s staged-psx-ce/USRDIR/cores/2048_libretro_ps3.SELF
+          test -s staged-psx-ce/USRDIR/cores/fceumm_libretro_ps3.SELF
+          test -s staged-psx-ce/USRDIR/EBOOT.BIN
+          sha256sum staged-psx-ce/USRDIR/cores/*.SELF > CORE-SHA256SUMS.txt
+
+      - name: Package merged CE as nonfinalized HEN test PKG
+        shell: bash
+        run: |
+          python3 scripts/pack_ce_debug.py staged-psx-ce \
+            RetroArch_Psx-Place_CGEMU342-UNTESTED.pkg \
+            UP0001-RETROARCH_00-0000111122223333
+          test -s RetroArch_Psx-Place_CGEMU342-UNTESTED.pkg
+          sha256sum RetroArch_Psx-Place_CGEMU342-UNTESTED.pkg >> CORE-SHA256SUMS.txt
+          cat >> BUILD-INFO.txt <<'EOF'
+          WARNING: Repacked as non-finalized homebrew PKG for PS3 HEN.
+          Not retail-signed, not compatible with stock unmodified firmware.
+          Full CE frontend + PSL1GHT-built CGEMU342 core has NOT been
+          validated on a physical PS3. Back up original saves/config first.
+          This targets TITLE_ID=RETROARCH and will overwrite the original CE
+          installation if installed. Prefer test add-on file copy first.
+          Original EBOOT.BIN and 2048_libretro_ps3.SELF are preserved unchanged.
+          No original binary files or ROMs are committed to GitHub.
+          EOF
+
+      - name: Upload merged original CE test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Original-PSX-Place-CE-CGEMU342-UNTESTED
+          path: |
+            RetroArch_Psx-Place_CGEMU342-UNTESTED.pkg
+            CORE-SHA256SUMS.txt
+            BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 7
