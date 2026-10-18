@@ -91,7 +91,7 @@ def entries(f, header):
         name = raw.decode("utf-8")
         path = PurePosixPath(name)
         if (path.is_absolute() or ".." in path.parts or
-            "\\" in name or ":" in name or not name.startswith(("USRDIR/", "PARAM.SFO", "ICON0.PNG", "PIC1.PNG", "PS3LOGO.DAT"))):
+            "\\" in name or ":" in name or not (name == "USRDIR" or name.startswith("USRDIR/") or name in ("PARAM.SFO", "ICON0.PNG", "PIC1.PNG", "PS3LOGO.DAT"))):
             raise ValueError(f"Unsafe package path {name!r}")
         if name in seen:
             raise ValueError(f"Duplicate archive name {name!r}")
