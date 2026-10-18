@@ -135,10 +135,33 @@ This is **not a PKG** and should **not** be installed through Package
 Manager. Compatibility of the PSL1GHT-built core with the existing
 Sony-SDK-built CE launcher **has not been proven** yet.
 
-The optional `scripts/stage_original_ce.py` safely stages a copy of the
-user-supplied original retail PKG together with the new core. It does not
-overwrite the original source file, repack a signed PKG or publish copyrighted
-game files. This script is for local packaging work, not for installing.
+The `scripts/stage_original_ce.py` script extracts the user's locally
+supplied retail CE PKG into a *new* staging directory (using a bounded,
+validated path/entry parser) and adds the CGEMU342 SELF; it does not overwrite
+the original input. `scripts/pack_ce_debug.py` can then construct a new
+**non-finalized (homebrew) test PKG** from those files, preserving the
+original EBOOT, 2048 core, assets and title metadata. On a PS3 with HEN,
+this *may* allow the CGEMU342 core to appear in the original CE app.
+There is no claim of retail signing or tested CE/PSL1GHT cross-compatibility.
+**Installing a merged PKG WILL target the original `RETROARCH` app ID**;
+back up settings and saves first, and prefer the reversible add-on test.
+
+Local use after downloading the CE add-on ZIP and locating the new SELF:
+
+```sh
+python3 -m pip install cryptography
+python3 scripts/stage_original_ce.py \
+  RetroArch_Psx-Place.pkg fceumm_libretro_ps3.SELF ./stage-ce
+python3 scripts/pack_ce_debug.py ./stage-ce \
+  RetroArch_Psx-Place_CGEMU342-UNTESTED.pkg \
+  UP0001-RETROARCH_00-0000111122223333
+```
+
+**Actions > Merge original PSX-Place CE PKG with CGEMU342** is the optional
+on-demand workflow performing the same sequence. It needs an HTTPS URL for
+the user's own original PKG and its SHA-256 hash. The original 238 MB
+binary is **not committed to GitHub**. Do not make your own copy of the
+original PKG publicly accessible merely for convenience.
 
 ## Next steps
 
