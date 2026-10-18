@@ -3,13 +3,20 @@
 NES / Famicom core development for **PlayStation 3 with HEN**, targeting the
 user-supplied **RetroArch PSX-Place Community Edition Beta 4** package.
 
-**Status: experimental PS3 HEN test PKG and standalone core.**
-The user has confirmed that the standalone PSL1GHT RetroArch PKG installs
-and launches on HEN, and normal single-game NES ROMs run. CGEMU342
-multi-ROM cartridges displayed their selector menu but selecting a child
-game resulted in a black screen on v1/v2. The v3 source implements the
-missing CGEMU342 embedded ROM selection; hardware testing is still needed.
-This is NOT yet a modified PSX-Place CE Beta 4 release.
+**Status: CGEMU342 v3 HEN test PKG confirmed working on real PS3 hardware
+(2026-10-18).** The user confirmed that the standalone PSL1GHT RetroArch
+PKG installs, launches and plays ordinary NES ROMs. On v1/v2 the CGEMU342
+multi-ROM selector appeared but launching a child game gave a black screen.
+After the v3 embedded-ROM handoff was added, the user reported that
+**55 in 1 Street Fighter**, **292 in 1**, and **146 in 1 Infinity**
+all work on PS3 HEN.
+
+**Tested binary:** [PS3-HEN-FCEUmm-CG342-Test-PKG-v3-8157,
+GitHub Actions run 39138485196](https://github.com/TVGameCartridge/CGEMU342-RetroArch-PS3/actions/runs/39138485196),
+built from commit `96ff47ee909e1f40dcf9598090ef9063b246b7dc`.
+This is a user-reported hardware result, not exhaustive verification of
+every game, mapper or feature. The Actions artifact has a limited retention
+period. This is NOT yet a modified PSX-Place CE Beta 4 release.
 
 ## Mappers
 
@@ -71,10 +78,11 @@ frame, it loads the selected embedded NES/UNIF child image, and RetroArch's
 reset command tries to return to the CGEMU342 launcher.
 The validated parser uses the format shared with the Android project and
 has synthetic positive/negative tests. No copyrighted ROMs are included.
-A successful Actions build does **not** prove that any of the user's
-55-in-1 Street Fighter / 292-in-1 / 146-in-1 Infinity files use that
-exact container layout or that the child image works on PS3. It does not
-include the ROM database required by automatic **Import Content** scanning.
+The user subsequently verified that all three CGEMU342 collections
+listed above launch games successfully on PS3 HEN using the v3 PKG.
+This is hardware evidence for those collections, not a guarantee for
+untested files or other mappers. The package does not include the ROM
+database required by automatic **Import Content** scanning.
 Try **Load Content > /dev_usb000/ > example.nes**. USB storage may also
 appear as `/dev_usb001/` depending on the port. Selecting a ROM
 must be verified on real hardware; a green Actions build is not
@@ -87,16 +95,18 @@ uses `SSNE10001`. It could overwrite an existing PS3 app with the
 same `SSNE10001` title ID. Never install blindly; back up PS3 data
 and test carefully on HEN-enabled hardware.
 
-Normal NES game loading is hardware-tested by the user. The CGEMU342
-container handler is new and remains unverified on hardware.
+Normal NES ROMs and the three named CGEMU342 multi-ROM collections
+have been confirmed working on PS3 HEN by the user; reset-to-menu,
+savestates, every included title and remaining mapper-specific games
+have not all been independently tested.
 The PS3 PSL1GHT menu initially uses circle (O) to confirm and cross (X)
 to go back, as confirmed by the user. Mapper-301 `8157` is not a
 universal mapper fix.
 
 ## Next steps
 
-- Build and test CGEMU342 v3 on HEN hardware, including all three
-  failing multi-ROM collections; verify child selection and reset-to-menu.
+- Preserve the successful v3 test package and source revision; verify
+  reset-to-menu, savestates and additional child games separately.
 - Identify the exact bundled core/frontend ABI and original build toolchain of
   **RetroArch PSX-Place CE Beta 4**.
 - Eventually integrate the custom NES core into the original PSX-Place CE Beta 4
