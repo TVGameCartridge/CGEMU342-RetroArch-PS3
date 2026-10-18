@@ -1,6 +1,12 @@
 name: Build PS3 HEN test PKG
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-ps3-test-pkg.yml'
+      - 'scripts/**'
+      - 'compat/**'
   workflow_dispatch:
     inputs:
       mapper301_mode:
