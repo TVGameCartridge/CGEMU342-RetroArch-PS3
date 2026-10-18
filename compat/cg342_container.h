@@ -89,7 +89,8 @@ static int cg342_entry_at(const uint8_t *rom, size_t size,
    for (i = 0; i < 128; ++i)
    {
       char ch = (char)p[24 + i];
-      if (!ch || ch == '/' || ch == '\\' || ch == ':' ||
+      if (!ch) break;
+      if (ch == '/' || ch == '\\' || ch == ':' ||
           ch == '*' || ch == '?' || ch == '"' || ch == '<' ||
           ch == '>' || ch == '|' || ch == '\n' || ch == '\r' ||
           (unsigned char)ch < 32)
