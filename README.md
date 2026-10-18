@@ -103,6 +103,43 @@ The PS3 PSL1GHT menu initially uses circle (O) to confirm and cross (X)
 to go back, as confirmed by the user. Mapper-301 `8157` is not a
 universal mapper fix.
 
+## Original PSX-Place CE Beta 4 package integration
+
+The original 238 MB `RetroArch_Psx-Place.pkg` was **actually inspected and
+decrypted** (not inferred from upstream repository defaults):
+
+- Metadata `TITLE_ID`: **`RETROARCH`**, not `SSNE10000`.
+- Content ID: `UP0001-RETROARCH_00-0000111122223333`.
+- Original bundled core: `USRDIR/cores/2048_libretro_ps3.SELF`.
+- The original includes `USRDIR/info/fceumm_libretro.info` but **no**
+  FCEUmm executable; it must be added.
+- 7584 package entries. Existing assets/configs and the 2048 core must
+  not be removed.
+
+**Actions > Build PSX-Place CE CGEMU342 add-on** creates
+`fceumm_libretro_ps3.SELF` using the tested CGEMU342 v3 core code, but
+rebases the PSL1GHT frontend's hardcoded PS3 runtime root to `RETROARCH`.
+The output archive contains only:
+
+```text
+USRDIR/cores/fceumm_libretro_ps3.SELF
+USRDIR/info/fceumm_libretro.info
+```
+
+For a reversible hardware compatibility test: back up the original CE
+config and installed files; use multiMAN to copy these **files** under
+`/dev_hdd0/game/RETROARCH/USRDIR/` (the `USRDIR` directory from
+the add-on corresponds to the installed app's `USRDIR`). Do not replace
+`EBOOT.BIN`, `2048_libretro_ps3.SELF` or the PS3 system installation.
+This is **not a PKG** and should **not** be installed through Package
+Manager. Compatibility of the PSL1GHT-built core with the existing
+Sony-SDK-built CE launcher **has not been proven** yet.
+
+The optional `scripts/stage_original_ce.py` safely stages a copy of the
+user-supplied original retail PKG together with the new core. It does not
+overwrite the original source file, repack a signed PKG or publish copyrighted
+game files. This script is for local packaging work, not for installing.
+
 ## Next steps
 
 - Preserve the successful v3 test package and source revision; verify
