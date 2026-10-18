@@ -50,6 +50,16 @@ jobs:
           MAPPER301_MODE: ${{ inputs.mapper301_mode || '8157' }}
         run: python3 scripts/prepare_fceumm.py upstream-fceumm --mapper301 "$MAPPER301_MODE"
 
+      - name: Integrate CGEMU342 embedded ROM selection and test directory
+        shell: bash
+        run: |
+          cc -std=c99 -Wall -Wextra -Werror -O2 \
+            tests/test_cg342_container.c -o /tmp/test_cg342_container
+          /tmp/test_cg342_container
+          python3 scripts/apply_cg342_fceumm.py upstream-fceumm
+          grep -q 'cg342_frame_end();' upstream-fceumm/src/drivers/libretro/libretro.c
+          grep -q 'cg342_return_to_menu()' upstream-fceumm/src/drivers/libretro/libretro.c
+
       - name: Add NES core metadata for content browsing
         shell: bash
         run: |
@@ -92,6 +102,8 @@ jobs:
           This test package is based on upstream RetroArch PSL1GHT, not PSX-Place CE Beta 4.
           Upstream PSL1GHT default app ID is SSNE10001; CE uses SSNE10000.
           This includes CORE.info metadata for manual .nes browsing.
+          v3 adds CGEMU342 embedded ROM handling and the RAM 07F2=A5 selection signal.
+          Synthetic parser tests and compilation are not real hardware validation.
           Import Content playlists need additional databases and are not guaranteed.
           Try Load Content > /dev_usb000/ > ROM.nes (or /dev_hdd0/).
           This is an untested homebrew build. Back up saves/configuration.
@@ -101,7 +113,7 @@ jobs:
       - name: Upload test PKG (hardware testing needed)
         uses: actions/upload-artifact@v4
         with:
-          name: PS3-HEN-FCEUmm-Test-PKG-v2-${{ inputs.mapper301_mode || '8157' }}
+          name: PS3-HEN-FCEUmm-CG342-Test-PKG-v3-${{ inputs.mapper301_mode || '8157' }}
           path: |
             upstream-retroarch/retroarch_psl1ght.pkg
             BUILD-INFO.txt
