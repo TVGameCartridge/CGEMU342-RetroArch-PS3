@@ -56,10 +56,20 @@ The workflow:
 
 ## Experimental HEN-installable PKG
 
-A second workflow, **Actions > Build PS3 HEN test PKG**, attempts to
-build upstream RetroArch's PSL1GHT application linked with the modified
-FCEUmm static core. It uses upstream RetroArch's package scripts to
+A second workflow, **Actions > Build PS3 HEN test PKG**, builds
+upstream RetroArch's PSL1GHT application linked with the modified FCEUmm
+static core. It uses upstream RetroArch's package scripts to
 create `retroarch_psl1ght.pkg` (if the entire build succeeds).
+
+**Test PKG v2** adds `USRDIR/info/CORE.info` from the upstream FCEUmm
+core-info database because RetroArch's packaged core is named
+`CORE.SELF`. This file declares supported `.nes` files so the
+Load Content file browser can detect the core. It does not include
+the ROM database required by automatic **Import Content** scanning.
+Try **Load Content > /dev_usb000/ > example.nes**. USB storage may also
+appear as `/dev_usb001/` depending on the port. Selecting a ROM
+must be verified on real hardware; a green Actions build is not
+proof that the menu or game loading works.
 
 **This is NOT a modification of the provided PSX-Place Community Edition
 Beta 4 package.** It is a separate experimental homebrew application.
