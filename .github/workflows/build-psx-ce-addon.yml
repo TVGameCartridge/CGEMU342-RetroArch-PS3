@@ -1,0 +1,110 @@
+name: Build PSX-Place CE CGEMU342 add-on
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-psx-ce-addon.yml'
+      - 'compat/**'
+      - 'scripts/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ce_addon:
+    name: Build FCEUmm CGEMU342 SELF for existing CE
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Fetch upstream frontend, core and core info
+        run: |
+          git clone --depth 1 --branch master https://github.com/libretro/libretro-fceumm.git upstream-fceumm
+          git clone --depth 1 --branch master https://github.com/libretro/RetroArch.git upstream-retroarch
+          git clone --depth 1 --branch master https://github.com/libretro/libretro-core-info.git upstream-core-info
+          {
+            echo "Build target: PSX-Place CE Beta 4 add-on, no original files overwritten in this archive."
+            echo "Based on supplied PKG Title ID: RETROARCH (PARAM.SFO)."
+            echo "FCEUmm source: $(git -C upstream-fceumm rev-parse HEAD)"
+            echo "RetroArch source: $(git -C upstream-retroarch rev-parse HEAD)"
+            echo "CGEMU342 mapper 301 mode: 8157"
+          } > BUILD-INFO.txt
+
+      - name: Prepare mapper, CGEMU342 and verify parser
+        run: |
+          python3 scripts/prepare_fceumm.py upstream-fceumm --mapper301 8157
+          cc -std=c99 -Wall -Wextra -Werror -O2 tests/test_cg342_container.c -o /tmp/cg342-parser-test
+          /tmp/cg342-parser-test
+          python3 scripts/apply_cg342_fceumm.py upstream-fceumm
+
+      - name: Set core runtime root to CE application ID
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('upstream-retroarch/frontend/drivers/platform_ps3.c')
+          s=p.read_text(encoding='utf-8')
+          old='#define EMULATOR_CONTENT_DIR "SSNE10001"'
+          new='#define EMULATOR_CONTENT_DIR "RETROARCH"'
+          if s.count(old)!=1:
+              raise SystemExit('Unexpected upstream PS3 runtime root; cannot patch safely')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+          grep -q '^#define EMULATOR_CONTENT_DIR "RETROARCH"' upstream-retroarch/frontend/drivers/platform_ps3.c
+
+      - name: Cross-compile and stage PS3 SELF core
+        shell: bash
+        run: |
+          docker run --rm --user root -v "$GITHUB_WORKSPACE:/work" -w /work \
+            reallibretroretroarch/libretro-build-psl1ght:latest \
+            bash -euc '
+              cd /work/upstream-fceumm
+              make -f Makefile.libretro -j2 platform=psl1ght HAVE_HDPACK=0 HAVE_NTSC=0
+              test -s fceumm_libretro_psl1ght.a
+              cd /work/upstream-retroarch
+              cp ../upstream-fceumm/fceumm_libretro_psl1ght.a libretro_psl1ght.a
+              make -f Makefile.psl1ght -j2 create-core
+              test -s pkg/psl1ght/pkg/USRDIR/cores/CORE.SELF
+            '
+          mkdir -p output/USRDIR/cores output/USRDIR/info
+          cp upstream-retroarch/pkg/psl1ght/pkg/USRDIR/cores/CORE.SELF \
+            output/USRDIR/cores/fceumm_libretro_ps3.SELF
+          cp upstream-core-info/fceumm_libretro.info \
+            output/USRDIR/info/fceumm_libretro.info
+          test -s output/USRDIR/cores/fceumm_libretro_ps3.SELF
+          sha256sum output/USRDIR/cores/fceumm_libretro_ps3.SELF > output/SHA256SUMS
+          cat >> BUILD-INFO.txt <<'EOF'
+
+          IMPORTANT: COMPATIBILITY EXPERIMENT, NOT TESTED WITH CE LAUNCHER.
+          This core is PSL1GHT-built; the PSX-Place CE frontend is a
+          different Sony-SDK-oriented build. Launch from original CE
+          must be tested on PS3 HEN.
+          Exact original package metadata:
+            TITLE_ID = RETROARCH
+            CONTENT_ID = UP0001-RETROARCH_00-0000111122223333
+          Overlay paths on PS3:
+            /dev_hdd0/game/RETROARCH/USRDIR/cores/fceumm_libretro_ps3.SELF
+            /dev_hdd0/game/RETROARCH/USRDIR/info/fceumm_libretro.info
+          Never overwrite EBOOT.BIN or 2048_libretro_ps3.SELF.
+          The info file already existed in the original package.
+          Do NOT install this archive as a PKG. It is a file overlay.
+          Back up original config/saves first. Copy SELF using multiMAN.
+          If CE refuses to boot the core, do not delete original cores.
+          EOF
+
+      - name: Upload non-destructive PSX-Place CE add-on
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSX-Place-CE-CGEMU342-FCEUmm-AddOn
+          path: |
+            output/USRDIR/cores/fceumm_libretro_ps3.SELF
+            output/USRDIR/info/fceumm_libretro.info
+            output/SHA256SUMS
+            BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
