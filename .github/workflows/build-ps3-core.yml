@@ -1,0 +1,76 @@
+name: Build PS3 FCEUmm core
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mapper301_mode:
+        description: "Mapper 301 hardware implementation"
+        required: true
+        type: choice
+        default: "8157"
+        options:
+          - "8157"
+          - "upstream"
+
+permissions:
+  contents: read
+
+jobs:
+  build_ps3_core:
+    name: Cross-compile FCEUmm (PSL1GHT)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout PS3 project
+        uses: actions/checkout@v4
+
+      - name: Checkout FCEUmm source
+        run: git clone --depth 1 --branch master https://github.com/libretro/libretro-fceumm.git upstream-fceumm
+
+      - name: Record source revision
+        shell: bash
+        run: |
+          echo "FCEUmm source: $(git -C upstream-fceumm rev-parse HEAD)" > BUILD-INFO.txt
+          echo "301 mode: ${{ inputs.mapper301_mode || '8157' }}" >> BUILD-INFO.txt
+          echo "Target: PSL1GHT static PS3 core (NOT a PKG)" >> BUILD-INFO.txt
+
+      - name: Check mapper IDs and select 301 compatibility
+        env:
+          MAPPER301_MODE: ${{ inputs.mapper301_mode || '8157' }}
+        run: python3 scripts/prepare_fceumm.py upstream-fceumm --mapper301 "$MAPPER301_MODE"
+
+      - name: Compile PS3 PowerPC core
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work/upstream-fceumm \
+            ghcr.io/02900/ps3-toolchain:latest \
+            bash -euc '
+              command -v powerpc64-ps3-elf-gcc
+              make -f Makefile.libretro \
+                platform=psl1ght HAVE_HDPACK=0 HAVE_NTSC=0 \
+                CC=powerpc64-ps3-elf-gcc \
+                AR=powerpc64-ps3-elf-ar \
+                -j2
+            '
+
+      - name: Verify static core output
+        shell: bash
+        run: |
+          test -s upstream-fceumm/fceumm_libretro_psl1ght.a
+          file upstream-fceumm/fceumm_libretro_psl1ght.a
+          ls -lh upstream-fceumm/fceumm_libretro_psl1ght.a
+
+      - name: Upload PS3 core (not installable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS3-FCEUmm-static-core-${{ inputs.mapper301_mode || '8157' }}
+          path: |
+            upstream-fceumm/fceumm_libretro_psl1ght.a
+            BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
