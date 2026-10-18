@@ -54,6 +54,24 @@ The workflow:
    [PSL1GHT / PS3DEV toolchain image](https://github.com/02900/ps3-toolchain).
 4. Uploads the compiled `.a` and the upstream revision for future integration.
 
+## Experimental HEN-installable PKG
+
+A second workflow, **Actions > Build PS3 HEN test PKG**, attempts to
+build upstream RetroArch's PSL1GHT application linked with the modified
+FCEUmm static core. It uses upstream RetroArch's package scripts to
+create `retroarch_psl1ght.pkg` (if the entire build succeeds).
+
+**This is NOT a modification of the provided PSX-Place Community Edition
+Beta 4 package.** It is a separate experimental homebrew application.
+PSX-Place CE uses title ID `SSNE10000`; upstream RetroArch PSL1GHT
+uses `SSNE10001`. It could overwrite an existing PS3 app with the
+same `SSNE10001` title ID. Never install blindly; back up PS3 data
+and test carefully on HEN-enabled hardware.
+
+No gameplay functionality or controller mapping is verified by a
+successful CI compile. In particular, the mapper-301 `8157` mode is
+an opt-in compatibility interpretation, not a universal mapper fix.
+
 ## Next steps
 
 - Confirm this static PS3 build works in Actions.
