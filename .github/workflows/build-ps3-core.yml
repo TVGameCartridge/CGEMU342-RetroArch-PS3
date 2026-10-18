@@ -42,6 +42,15 @@ jobs:
           MAPPER301_MODE: ${{ inputs.mapper301_mode || '8157' }}
         run: python3 scripts/prepare_fceumm.py upstream-fceumm --mapper301 "$MAPPER301_MODE"
 
+      - name: Test and integrate CGEMU342 game selection
+        shell: bash
+        run: |
+          cc -std=c99 -Wall -Wextra -Werror -O2 \
+            tests/test_cg342_container.c -o /tmp/test_cg342_container
+          /tmp/test_cg342_container
+          python3 scripts/apply_cg342_fceumm.py upstream-fceumm
+          echo "CGEMU342 embedded game selection: enabled" >> BUILD-INFO.txt
+
       - name: Compile PS3 PowerPC core
         shell: bash
         run: |
@@ -68,7 +77,7 @@ jobs:
       - name: Upload PS3 core (not installable)
         uses: actions/upload-artifact@v4
         with:
-          name: PS3-FCEUmm-static-core-${{ inputs.mapper301_mode || '8157' }}
+          name: PS3-CG342-FCEUmm-static-core-${{ inputs.mapper301_mode || '8157' }}
           path: |
             upstream-fceumm/fceumm_libretro_psl1ght.a
             BUILD-INFO.txt
