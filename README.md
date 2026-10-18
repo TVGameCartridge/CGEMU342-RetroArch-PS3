@@ -3,11 +3,13 @@
 NES / Famicom core development for **PlayStation 3 with HEN**, targeting the
 user-supplied **RetroArch PSX-Place Community Edition Beta 4** package.
 
-**Status: Stage 1 — PS3 FCEUmm core build.** This repository does **not yet**
-generate an installable `.pkg`. The output of the current GitHub Actions
-workflow is `fceumm_libretro_psl1ght.a`, a static PowerPC core library.
-This library must be integrated with a compatible RetroArch PS3 frontend
-before a HEN-installable application can be packaged and tested.
+**Status: experimental PS3 HEN test PKG and standalone core.**
+The user has confirmed that the standalone PSL1GHT RetroArch PKG installs
+and launches on HEN, and normal single-game NES ROMs run. CGEMU342
+multi-ROM cartridges displayed their selector menu but selecting a child
+game resulted in a black screen on v1/v2. The v3 source implements the
+missing CGEMU342 embedded ROM selection; hardware testing is still needed.
+This is NOT yet a modified PSX-Place CE Beta 4 release.
 
 ## Mappers
 
@@ -43,7 +45,7 @@ compilation alone does not establish mapper correctness.
 
 Open **Actions > Build PS3 FCEUmm core > Run workflow**. Choose the 301
 mode if needed. Builds also start automatically when `main` changes.
-Download the `PS3-FCEUmm-static-core-...` artifact after a successful run.
+Download the `PS3-CG342-FCEUmm-static-core-...` artifact after a successful run.
 **Do not try to install this `.a` library on the PS3**.
 
 The workflow:
@@ -61,11 +63,18 @@ upstream RetroArch's PSL1GHT application linked with the modified FCEUmm
 static core. It uses upstream RetroArch's package scripts to
 create `retroarch_psl1ght.pkg` (if the entire build succeeds).
 
-**Test PKG v2** adds `USRDIR/info/CORE.info` from the upstream FCEUmm
-core-info database because RetroArch's packaged core is named
-`CORE.SELF`. This file declares supported `.nes` files so the
-Load Content file browser can detect the core. It does not include
-the ROM database required by automatic **Import Content** scanning.
+**Test PKG v2** added `USRDIR/info/CORE.info` from upstream FCEUmm.
+**Test PKG v3** also patches FCEUmm to read the CGEMU342 directory at the
+end of a container ROM and respond to the NES RAM handshake
+(`$07F0/$07F1` = selected child ID, `$07F2` = `$A5`). After each
+frame, it loads the selected embedded NES/UNIF child image, and RetroArch's
+reset command tries to return to the CGEMU342 launcher.
+The validated parser uses the format shared with the Android project and
+has synthetic positive/negative tests. No copyrighted ROMs are included.
+A successful Actions build does **not** prove that any of the user's
+55-in-1 Street Fighter / 292-in-1 / 146-in-1 Infinity files use that
+exact container layout or that the child image works on PS3. It does not
+include the ROM database required by automatic **Import Content** scanning.
 Try **Load Content > /dev_usb000/ > example.nes**. USB storage may also
 appear as `/dev_usb001/` depending on the port. Selecting a ROM
 must be verified on real hardware; a green Actions build is not
@@ -78,16 +87,20 @@ uses `SSNE10001`. It could overwrite an existing PS3 app with the
 same `SSNE10001` title ID. Never install blindly; back up PS3 data
 and test carefully on HEN-enabled hardware.
 
-No gameplay functionality or controller mapping is verified by a
-successful CI compile. In particular, the mapper-301 `8157` mode is
-an opt-in compatibility interpretation, not a universal mapper fix.
+Normal NES game loading is hardware-tested by the user. The CGEMU342
+container handler is new and remains unverified on hardware.
+The PS3 PSL1GHT menu initially uses circle (O) to confirm and cross (X)
+to go back, as confirmed by the user. Mapper-301 `8157` is not a
+universal mapper fix.
 
 ## Next steps
 
-- Confirm this static PS3 build works in Actions.
+- Build and test CGEMU342 v3 on HEN hardware, including all three
+  failing multi-ROM collections; verify child selection and reset-to-menu.
 - Identify the exact bundled core/frontend ABI and original build toolchain of
   **RetroArch PSX-Place CE Beta 4**.
-- Integrate the core into a compatible frontend and package it as a PS3 `.pkg`.
+- Eventually integrate the custom NES core into the original PSX-Place CE Beta 4
+  frontend without losing its other built-in emulators.
 - Test with HEN enabled on real hardware: Master Fighter VI (264),
   301 multicarts, and the remaining mapper-specific ROMs.
 - Back up any existing PS3 RetroArch configuration, saves, and original `.pkg`
