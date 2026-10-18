@@ -14,6 +14,9 @@ import shutil
 
 
 RUNTIME = r'''
+/* check_variables is defined later in upstream libretro.c. */
+static void check_variables(bool startup);
+
 /* CGEMU342 integration - only active for a validated container footer. */
 static uint8_t *cg342_container;
 static size_t cg342_container_size;
