@@ -163,6 +163,39 @@ the user's own original PKG and its SHA-256 hash. The original 238 MB
 binary is **not committed to GitHub**. Do not make your own copy of the
 original PKG publicly accessible merely for convenience.
 
+## PSX-Place CE FCEUmm RSX bilinear test (2026-10-19)
+
+The user reported that the CGEMU342 FCEUmm core runs in their larger installed
+PSX-Place CE app and that Turbo A/B works after configuring
+`fceumm_turbo_enable = "Both"` in `USRDIR/config/FCEUmm/FCEUmm.opt`.
+However, the FCEUmm picture remains nearest-neighbor/pixelated even with
+`video_smooth = "true"` and `video_shader_enable = "false"` in the
+FCEUmm config override.
+
+The newer PSL1GHT FCEUmm SELF embeds a RetroArch frontend using the
+**RSX / GCM graphics driver**, unlike the older PSX-Place SDK OpenGL
+frontend. In upstream `gfx/drivers/rsx_gfx.c`, video filtering uses
+`gcm->smooth` to select `TEXTURE_FILTER_LINEAR` vs
+`TEXTURE_FILTER_NEAREST`, but `rsx_init()` zero-initializes the state
+without copying `video->smooth`. The new isolated experiment
+`scripts/fix_ps3_rsx_bilinear.py` copies `video->smooth` on init and
+updates it every frame from `video_info->video_smooth`.
+
+**Actions > Build PSX-Place CE FCEUmm RSX Bilinear Fix** produces an
+isolated replacement `USRDIR/cores/fceumm_libretro_ps3.SELF`. Back up
+the known-working original core, then replace only this one SELF with
+multiMAN at `/dev_hdd0/game/RETROARCH/USRDIR/cores/`. Do not delete
+the original EBOOT or other cores. The fix is **experimental** and
+requires physical PS3 verification; it is not a proven cure. Continue
+using the user's Turbo A/B FCEUmm opt file unchanged.
+
+Removing unnecessary PSX-Place CE cores requires extra care: CE stores
+its last loaded core in `retroarch.salamander.cfg`. If that core is
+deleted, CE may return straight to XMB on next launch. Always load
+and exit from a core you intend to keep before removing another
+`*_libretro_ps3.SELF`, and move unwanted cores to USB before deleting
+permanently. See the CE Beta 4 PSX-Place support discussion.
+
 ## Next steps
 
 - Preserve the successful v3 test package and source revision; verify
