@@ -1,0 +1,105 @@
+name: Build PSX-Place CE FCEUmm RSX Bilinear Fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-psx-ce-rsx-bilinear-fix.yml'
+      - 'scripts/fix_ps3_rsx_bilinear.py'
+      - 'scripts/prepare_fceumm.py'
+      - 'scripts/apply_cg342_fceumm.py'
+      - 'compat/**'
+      - 'tests/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: CGEMU342 FCEUmm SELF with RSX bilinear fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch PS3 frontend and emulator source
+        run: |
+          git clone --depth 1 --branch master https://github.com/libretro/libretro-fceumm.git upstream-fceumm
+          git clone --depth 1 --branch master https://github.com/libretro/RetroArch.git upstream-retroarch
+          git clone --depth 1 --branch master https://github.com/libretro/libretro-core-info.git upstream-core-info
+          {
+            echo "Source FCEUmm: $(git -C upstream-fceumm rev-parse HEAD)"
+            echo "Source RetroArch RSX: $(git -C upstream-retroarch rev-parse HEAD)"
+            echo "Video change: RSX takes smooth from video->smooth at startup"
+            echo "Video change: RSX tracks video_info->video_smooth each frame"
+            echo "Turbo options remain configured through FCEUmm .opt"
+            echo "Only for PS3 HEN, title RETROARCH app core folder"
+          } > BUILD-INFO.txt
+
+      - name: Integrate tested CGEMU342 mapper and embedded games
+        run: |
+          python3 scripts/prepare_fceumm.py upstream-fceumm --mapper301 8157
+          cc -std=c99 -Wall -Wextra -Werror -O2 tests/test_cg342_container.c -o /tmp/test-cg342
+          /tmp/test-cg342
+          python3 scripts/apply_cg342_fceumm.py upstream-fceumm
+
+      - name: Fix RSX Bilinear startup and live toggle
+        run: |
+          python3 scripts/fix_ps3_rsx_bilinear.py upstream-retroarch
+          grep -q 'rsx->smooth = video->smooth' upstream-retroarch/gfx/drivers/rsx_gfx.c
+          grep -q 'gcm->smooth = video_info->video_smooth' upstream-retroarch/gfx/drivers/rsx_gfx.c
+
+      - name: Target installed PSX-Place CE RETROARCH folder
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("upstream-retroarch/frontend/drivers/platform_ps3.c")
+          s=p.read_text(encoding="utf-8")
+          a='#define EMULATOR_CONTENT_DIR "SSNE10001"'
+          if s.count(a) != 1:
+              raise SystemExit("Unexpected RetroArch PS3 frontend")
+          p.write_text(s.replace(a,'#define EMULATOR_CONTENT_DIR "RETROARCH"'),encoding="utf-8")
+          PY
+
+      - name: Build PS3 SELf with the RSX video fix
+        shell: bash
+        run: |
+          docker run --rm --user root -v "$GITHUB_WORKSPACE:/work" -w /work \
+            reallibretroretroarch/libretro-build-psl1ght:latest \
+            bash -euc '
+              cd /work/upstream-fceumm
+              make -f Makefile.libretro -j2 platform=psl1ght HAVE_HDPACK=0 HAVE_NTSC=0
+              test -s fceumm_libretro_psl1ght.a
+              cd /work/upstream-retroarch
+              cp ../upstream-fceumm/fceumm_libretro_psl1ght.a libretro_psl1ght.a
+              make -f Makefile.psl1ght -j2 create-core
+              test -s pkg/psl1ght/pkg/USRDIR/cores/CORE.SELF
+            '
+          mkdir -p output/USRDIR/cores output/USRDIR/info
+          cp upstream-retroarch/pkg/psl1ght/pkg/USRDIR/cores/CORE.SELF output/USRDIR/cores/fceumm_libretro_ps3.SELF
+          cp upstream-core-info/fceumm_libretro.info output/USRDIR/info/fceumm_libretro.info
+          sha256sum output/USRDIR/cores/fceumm_libretro_ps3.SELF > output/SHA256SUMS
+          cat >> BUILD-INFO.txt <<'EOF'
+
+          TESTED ONLY BY COMPILATION; PHYSICAL PS3 BILINEAR TEST STILL NEEDED.
+          Important: save your current known-working fceumm_libretro_ps3.SELF
+          on USB before replacing. Use multiMAN to copy only the .SELF file:
+          /dev_hdd0/game/RETROARCH/USRDIR/cores/fceumm_libretro_ps3.SELF
+          Keep your original EBOOT.BIN and all other cores.
+          Keep config/FCEUmm/FCEUmm.opt containing turbo Enable = Both.
+          Existing shaders or game-specific video overrides may still apply.
+          This is NOT an installable PKG: it is a reversible core replacement.
+          EOF
+
+      - name: Publish isolated RSX fix core
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSX-Place-CGEMU342-RSX-BilinearFix-TEST
+          path: |
+            output/USRDIR/cores/fceumm_libretro_ps3.SELF
+            output/USRDIR/info/fceumm_libretro.info
+            output/SHA256SUMS
+            BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
