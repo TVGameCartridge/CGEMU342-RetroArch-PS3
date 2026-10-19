@@ -46,10 +46,10 @@ def stage(input_zip: Path, palette: Path, dst: Path) -> None:
             if needed not in names:
                 raise ValueError("Missing installed-file requirement: " + needed)
         sfo = z.read("PARAM.SFO")
-        if b"RETROARCH\\0" not in sfo or b"PSX-Place" not in sfo:
+        if b"RETROARCH\0" not in sfo or b"PSX-Place" not in sfo:
             raise ValueError("Unexpected title ID or distribution")
         main_cfg = z.read("USRDIR/retroarch.cfg").decode("utf-8")
-        if not re.search(r'^menu_driver\\s*=\\s*"rgui"', main_cfg, re.M):
+        if not re.search(r'^menu_driver\s*=\s*"rgui"', main_cfg, re.M):
             raise ValueError("Current menu is not RGUI; do not prune menu themes")
         if 'system_directory = "/dev_hdd0/game/RETROARCH/USRDIR/system"' not in main_cfg:
             raise ValueError("Unexpected FCEUmm system dir for nes.pal")
@@ -70,7 +70,7 @@ def stage(input_zip: Path, palette: Path, dst: Path) -> None:
         for item in z.infolist():
             name = item.filename
             path = PurePosixPath(name)
-            if path.is_absolute() or ".." in path.parts or "\\\\" in name or ":" in name:
+            if path.is_absolute() or ".." in path.parts or "\\" in name or ":" in name:
                 raise ValueError("Unsafe ZIP entry: " + name)
             if not path.parts or not (path.parts[0] == "USRDIR" or name in (
                     "PARAM.SFO", "ICON0.PNG", "PIC1.PNG", "PS3LOGO.DAT", "SND0.AT3")):
